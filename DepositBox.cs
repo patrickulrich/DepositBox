@@ -7,7 +7,7 @@ using System.Globalization;
 
 namespace Oxide.Plugins
 {
-    [Info("DepositBox", "saulteafarmer", "0.1.4")]
+    [Info("DepositBox", "saulteafarmer", "0.1.5")]
     [Description("Drop box that registers drops for admin while removing items from the game.")]
     internal class DepositBox : RustPlugin
     {
@@ -132,8 +132,10 @@ namespace Oxide.Plugins
 
             logger.LogDeposit(player, amount);
 
-            player.ChatMessage(lang.GetMessage("DepositRecorded", this, player.UserIDString)
-                .Replace("{amount}", amount.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
+            var depositMessage = lang.GetMessage("DepositRecorded", this, player.UserIDString);
+            depositMessage = depositMessage.Replace("{amount}", amount.ToString(CultureInfo.InvariantCulture)); // Fixed Replace
+
+            player.ChatMessage(depositMessage);
         }
 
         public void TrackDeposit(Item item, BasePlayer player)
