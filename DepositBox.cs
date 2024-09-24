@@ -6,12 +6,10 @@ using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-    [Info("DepositBox", "saulteafarmer", "0.1.0")]
+    [Info("DepositBox", "saulteafarmer", "0.1.1")]
     [Description("Drop box that registers drops for admin while removing items from the game.")]
     internal class DepositBox : RustPlugin
     {
-        private static DepositBox instance;
-
         // Configuration variables
         private int DepositItemID;
         private ulong DepositBoxSkinID;
@@ -26,7 +24,6 @@ namespace Oxide.Plugins
 
         void Init()
         {
-            instance = this;
             LoadConfiguration();
             LoadDepositLog();
             permission.RegisterPermission(permPlace, this);
@@ -61,7 +58,6 @@ namespace Oxide.Plugins
                     restriction.Destroy();
                 }
             }
-            instance = null;
         }
 
         void OnEntitySpawned(StorageContainer container)
@@ -72,7 +68,7 @@ namespace Oxide.Plugins
             {
                 mono = container.gameObject.AddComponent<DepositBoxRestriction>();
                 mono.container = container.inventory;  // Assign inventory upon component addition
-                mono.InitDepositBox();
+                mono.InitDepositBox(this);  // Pass the parent instance
             }
         }
 
@@ -100,9 +96,11 @@ namespace Oxide.Plugins
         public class DepositBoxRestriction : FacepunchBehaviour
         {
             public ItemContainer container;
+            private DepositBox parent;
 
-            public void InitDepositBox()
+            public void InitDepositBox(DepositBox depositBox)
             {
+                parent = depositBox; // Store reference to the parent DepositBox instance
                 container.canAcceptItem += CanAcceptItem;
                 container.onItemAddedRemoved += OnItemAddedRemoved;
             }
@@ -110,14 +108,14 @@ namespace Oxide.Plugins
             private bool CanAcceptItem(Item item, int targetPos)
             {
                 // Only allow the configured deposit item to be deposited
-                if (item == null || item.info == null || item.info.itemid != DepositBox.instance.DepositItemID)
+                if (item == null || item.info == null || item.info.itemid != parent.DepositItemID)
                 {
                     return false;
                 }
 
                 if (item.GetOwnerPlayer() is BasePlayer player)
                 {
-                    DepositBox.instance.TrackDeposit(item, player); // Track the item with player reference
+                    parent.TrackDeposit(item, player); // Track the item with player reference
                 }
 
                 return true;
@@ -126,13 +124,13 @@ namespace Oxide.Plugins
             private void OnItemAddedRemoved(Item item, bool added)
             {
                 // Early exit if item isn't added or isn't the correct deposit item
-                if (!added || item.info.itemid != DepositBox.instance.DepositItemID) return;
+                if (!added || item.info.itemid != parent.DepositItemID) return;
 
                 // Try to get the player who deposited the item
-                if (DepositBox.instance.depositTrack.TryGetValue(item, out BasePlayer player))
+                if (parent.depositTrack.TryGetValue(item, out BasePlayer player))
                 {
-                    DepositBox.instance.LogDeposit(player, item.amount); // Log the deposit first
-                    DepositBox.instance.depositTrack.Remove(item); // Remove from tracking
+                    parent.LogDeposit(player, item.amount); // Log the deposit first
+                    parent.depositTrack.Remove(item); // Remove from tracking
 
                     // Now remove the deposited item from the box, after logging is complete
                     item.Remove();
