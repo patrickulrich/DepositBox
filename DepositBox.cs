@@ -7,58 +7,35 @@ using System.Globalization;
 
 namespace Oxide.Plugins
 {
-    [Info("DepositBox", "saulteafarmer", "0.1.2")]
+    [Info("DepositBox", "saulteafarmer", "0.1.3")]
     [Description("Drop box that registers drops for admin while removing items from the game.")]
     internal class DepositBox : RustPlugin
     {
-        // Configuration variables
+        // Configuration, Logging, and Tracking Classes
         private int DepositItemID;
         private ulong DepositBoxSkinID;
+        private DepositLogger logger;
+        private DepositTracker tracker;
 
         // Permission constant
         private const string permPlace = "depositbox.place";
-
-        private DepositLog depositLog;
-        private Dictionary<Item, BasePlayer> depositTrack = new Dictionary<Item, BasePlayer>(); // Track deposits
 
         #region Oxide Hooks
 
         void Init()
         {
+            logger = new DepositLogger();
+            tracker = new DepositTracker();
+
             LoadConfiguration();
-            LoadDepositLog();
             permission.RegisterPermission(permPlace, this);
         }
 
         protected override void LoadDefaultConfig()
         {
-            PrintWarning("Creating a new configuration file.");
-
             Config["DepositItemID"] = -1779183908;    // Default Item ID for deposits (paper)
             Config["DepositBoxSkinID"] = 1641384897;  // Default skin ID for the deposit box
             SaveConfig();
-        }
-
-        void OnServerInitialized(bool initial)
-        {
-            foreach (var entity in BaseNetworkable.serverEntities)
-            {
-                if (entity is StorageContainer storageContainer)
-                {
-                    OnEntitySpawned(storageContainer);
-                }
-            }
-        }
-
-        void Unload()
-        {
-            foreach (var entity in BaseNetworkable.serverEntities)
-            {
-                if (entity is StorageContainer storageContainer && storageContainer.TryGetComponent(out DepositBoxRestriction restriction))
-                {
-                    restriction.Destroy();
-                }
-            }
         }
 
         void OnEntitySpawned(StorageContainer container)
@@ -68,8 +45,8 @@ namespace Oxide.Plugins
             if (!container.TryGetComponent(out DepositBoxRestriction mono))
             {
                 mono = container.gameObject.AddComponent<DepositBoxRestriction>();
-                mono.container = container.inventory;  // Assign inventory upon component addition
-                mono.InitDepositBox(this);  // Pass the parent instance
+                mono.container = container.inventory;
+                mono.InitDepositBox(this);
             }
         }
 
@@ -101,14 +78,13 @@ namespace Oxide.Plugins
 
             public void InitDepositBox(DepositBox depositBox)
             {
-                parent = depositBox; // Store reference to the parent DepositBox instance
+                parent = depositBox;
                 container.canAcceptItem += CanAcceptItem;
                 container.onItemAddedRemoved += OnItemAddedRemoved;
             }
 
             private bool CanAcceptItem(Item item, int targetPos)
             {
-                // Only allow the configured deposit item to be deposited
                 if (item == null || item.info == null || item.info.itemid != parent.DepositItemID)
                 {
                     return false;
@@ -116,7 +92,7 @@ namespace Oxide.Plugins
 
                 if (item.GetOwnerPlayer() is BasePlayer player)
                 {
-                    parent.TrackDeposit(item, player); // Track the item with player reference
+                    parent.TrackDeposit(item, player);
                 }
 
                 return true;
@@ -124,16 +100,12 @@ namespace Oxide.Plugins
 
             private void OnItemAddedRemoved(Item item, bool added)
             {
-                // Early exit if item isn't added or isn't the correct deposit item
                 if (!added || item.info.itemid != parent.DepositItemID) return;
 
-                // Try to get the player who deposited the item
-                if (parent.depositTrack.TryGetValue(item, out BasePlayer player))
+                if (parent.GetTrackedPlayer(item) is BasePlayer player)
                 {
-                    parent.LogDeposit(player, item.amount); // Log the deposit first
-                    parent.depositTrack.Remove(item); // Remove from tracking
-
-                    // Now remove the deposited item from the box, after logging is complete
+                    parent.LogDeposit(player, item.amount);
+                    parent.RemoveTrackedDeposit(item);
                     item.Remove();
                 }
             }
@@ -150,59 +122,27 @@ namespace Oxide.Plugins
 
         #region Logging
 
-        private class DepositLog
-        {
-            [JsonProperty("deposits")]
-            public List<DepositEntry> Deposits { get; set; } = new List<DepositEntry>();
-        }
-
-        private class DepositEntry
-        {
-            [JsonProperty("steamid")]
-            public string SteamId { get; set; }
-
-            [JsonProperty("timestamp")]
-            public string Timestamp { get; set; }
-
-            [JsonProperty("amount_deposited")]
-            public int AmountDeposited { get; set; }
-        }
-
         public void LogDeposit(BasePlayer player, int amount)
         {
-            var entry = new DepositEntry
-            {
-                SteamId = player.UserIDString,
-                Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture), // Use IFormatProvider here
-                AmountDeposited = amount
-            };
+            logger.LogDeposit(player, amount);
 
-            Puts($"Logging deposit: SteamID={entry.SteamId}, Amount={entry.AmountDeposited}, Timestamp={entry.Timestamp}");
-
-            depositLog.Deposits.Add(entry);
-            SaveDepositLog();
-
-            // Send message to the player
             player.ChatMessage(lang.GetMessage("DepositRecorded", this, player.UserIDString)
-                .Replace("{amount}", amount.ToString(CultureInfo.InvariantCulture)));  // Use IFormatProvider here
+                .Replace("{amount}", amount.ToString(CultureInfo.InvariantCulture)));
         }
 
         public void TrackDeposit(Item item, BasePlayer player)
         {
-            if (item != null && player != null)
-            {
-                depositTrack[item] = player; // Track the item with its owner
-            }
+            tracker.TrackDeposit(item, player);
         }
 
-        private void LoadDepositLog()
+        public BasePlayer GetTrackedPlayer(Item item)
         {
-            depositLog = Interface.Oxide.DataFileSystem.ReadObject<DepositLog>("DepositBoxLog") ?? new DepositLog();
+            return tracker.GetTrackedPlayer(item);
         }
 
-        private void SaveDepositLog()
+        public void RemoveTrackedDeposit(Item item)
         {
-            Interface.Oxide.DataFileSystem.WriteObject("DepositBoxLog", depositLog);
+            tracker.RemoveTrackedDeposit(item);
         }
 
         #endregion
@@ -211,8 +151,8 @@ namespace Oxide.Plugins
 
         private void LoadConfiguration()
         {
-            DepositItemID = Convert.ToInt32(Config["DepositItemID"], CultureInfo.InvariantCulture);  // Use IFormatProvider here
-            DepositBoxSkinID = Convert.ToUInt64(Config["DepositBoxSkinID"], CultureInfo.InvariantCulture);  // Use IFormatProvider here
+            DepositItemID = Convert.ToInt32(Config["DepositItemID"]);
+            DepositBoxSkinID = Convert.ToUInt64(Config["DepositBoxSkinID"]);
         }
 
         #endregion
@@ -225,11 +165,86 @@ namespace Oxide.Plugins
             {
                 ["NoPermission"] = "You do not have permission to place this box.",
                 ["BoxGiven"] = "You have received a Deposit Box.",
-                ["DepositRecorded"] = "Your deposit of {amount} has been recorded.",
-                ["PlacedNoPerm"] = "You have placed a deposit box but lack permission to place it."
+                ["DepositRecorded"] = "Your deposit of {amount} has been recorded."
             }, this);
         }
 
         #endregion
     }
+
+    #region Helper Classes
+
+    public class DepositLogger
+    {
+        private readonly DepositLog depositLog;
+
+        public DepositLogger()
+        {
+            depositLog = Interface.Oxide.DataFileSystem.ReadObject<DepositLog>("DepositBoxLog") ?? new DepositLog();
+        }
+
+        public void LogDeposit(BasePlayer player, int amount)
+        {
+            var entry = new DepositEntry
+            {
+                SteamId = player.UserIDString,
+                Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+                AmountDeposited = amount
+            };
+
+            Interface.Oxide.LogInfo($"Logging deposit: SteamID={entry.SteamId}, Amount={entry.AmountDeposited}, Timestamp={entry.Timestamp}");
+
+            depositLog.Deposits.Add(entry);
+            SaveDepositLog();
+        }
+
+        private void SaveDepositLog()
+        {
+            Interface.Oxide.DataFileSystem.WriteObject("DepositBoxLog", depositLog);
+        }
+    }
+
+    public class DepositTracker
+    {
+        private readonly Dictionary<Item, BasePlayer> depositTrack = new Dictionary<Item, BasePlayer>();
+
+        public void TrackDeposit(Item item, BasePlayer player)
+        {
+            if (item != null && player != null)
+            {
+                depositTrack[item] = player;
+            }
+        }
+
+        public BasePlayer GetTrackedPlayer(Item item)
+        {
+            depositTrack.TryGetValue(item, out BasePlayer player);
+            return player;
+        }
+
+        public void RemoveTrackedDeposit(Item item)
+        {
+            depositTrack.Remove(item);
+        }
+    }
+
+    public class DepositLog
+    {
+        [JsonProperty("deposits")]
+        public List<DepositEntry> Deposits { get; set; } = new List<DepositEntry>();
+    }
+
+    public class DepositEntry
+    {
+        [JsonProperty("steamid")]
+        public string SteamId { get; set; }
+
+        [JsonProperty("timestamp")]
+        public string Timestamp { get; set; }
+
+        [JsonProperty("amount_deposited")]
+        public int AmountDeposited { get; set; }
+    }
+
+    #endregion
 }
