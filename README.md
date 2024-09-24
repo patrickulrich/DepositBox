@@ -1,88 +1,112 @@
-## Overview
+## Overview:
+The **Orangemart** plugin allows players on your Rust server to buy and sell in-game units and VIP status using Bitcoin payments through the Lightning Network. This plugin integrates LNBits into the game, enabling secure transactions for game items and services.
 
-The **DepositBox** plugin allows players to deposit specific items (e.g., paper) into a dropbox, logging the deposits and removing the items from the game. This can be used to create events or competitions, such as a system where players compete to turn in the most items (similar to the Twitch Rust event where players compete for dog tags).
+---
 
-### Features
-- Only designated items can be deposited.
-- Logs all deposits for tracking.
-- Configurable deposit box skin and item type.
-- Prevents non-whitelisted items from being deposited.
-- Can be used to run events or competitions where players turn in items for rewards.
+## Features
 
-Once installed players with permission will be able to create a deposit box using /depositbox as a chat command. They can then place this box down allowing players to make deposits into it. All deposits are logged to the data folder.
+- **In-Game Currency Purchase:** Players can purchase in-game currency using Bitcoin payments.
+- **Send In-Game Currency:** Players can send currency to others, facilitating peer-to-peer transactions.
+- **VIP Status Purchase:** Players can purchase VIP status through Bitcoin payments, unlocking special privileges.
+- **Configurable:** Server admins can set up command names, currency items, prices, and more through the configuration file.
 
-## Installation
+---
 
-1. Upload the `DepositBox.cs` file to your Rust server under the `/oxide/plugins/` directory.
-2. Restart or reload the server for the plugin to initialize:
-   ```bash
-   oxide.reload DepositBox
-   ```
-3. Ensure you grant users permission to use the deposit box:
-   ```bash
-   oxide.grant user <username> depositbox.place
-   ```
+## Commands
+
+The following commands are available to players:
+
+- **`/buyblood`**  
+  Players can purchase in-game currency using Bitcoin. The amount purchased is configurable.
+
+- **`/sendblood <amount> <targetPlayer>`**  
+  Players can send a specified amount of in-game currency to another player.
+
+- **`/buyvip`**  
+  Players can purchase VIP status using Bitcoin. The VIP price and associated permission group are configurable.
+
+---
 
 ## Configuration
 
-Upon the first run, a default configuration file will be generated at `/oxide/config/DepositBox.json`. The configuration contains the following settings:
+Below is a list of key configuration variables that can be customized in the plugin:
 
-```json
-{
-    "DepositItemID": -1779183908,      // The item ID for your deposit unit (default: -1779183908)
-    "DepositBoxSkinID": 1641384897   // The skin ID for the deposit box
-}
-```
+- **`CurrencyItemID`**  
+  The item ID used for in-game currency transactions.
 
-You can edit these values directly in the configuration file if needed.
+- **`BuyCurrencyCommandName`**  
+  The name of the command players use to buy in-game currency.
 
-- **DepositItemID**: The Rust item ID of the item that can be deposited (default: paper with ID `-1779183908`).
-- **DepositBoxSkinID**: The Rust skin ID applied to the deposit box (default: `1641384897`).
+- **`SendCurrencyCommandName`**  
+  The name of the command players use to send in-game currency to other players.
 
-### Customizing the Configuration:
+- **`BuyVipCommandName`**  
+  The name of the command players use to purchase VIP status.
 
-1. Navigate to `/oxide/config/DepositBox.json`.
-2. Modify the values as needed.
-3. Save the file and reload the plugin:
-   ```bash
-   oxide.reload DepositBox
+- **`VipPrice`**  
+  The price (in satoshis) for players to purchase VIP status.
+
+- **`VipPermissionGroup`**  
+  The Oxide permission group that VIP players are added to.
+
+- **`CurrencyName`**  
+  The name of the in-game currency.
+
+- **`SatsPerCurrencyUnit`**  
+  The conversion rate between satoshis and in-game currency units.
+
+- **`PricePerCurrencyUnit`**  
+  The price (in satoshis) per unit of in-game currency.
+
+- **`CheckIntervalSeconds`**  
+  Interval time (in seconds) for checking pending Bitcoin transactions.
+
+---
+
+## Installation
+
+1. **Download the Plugin**  
+   Place the `Orangemart.cs` file in your server's `oxide/plugins` folder.
+
+2. **Configuration**  
+   Modify the plugin’s configuration file to fit your server’s settings (currency item, prices, VIP group, etc.). The configuration file will be automatically generated upon running the plugin for the first time.
+
+3. **Create VIP Group (Optional)**  
+   Create a VIP group to assign permssions to.
+   
+4. **Reload the Plugin**  
+   Once configured, reload the plugin using the command:  
+   ```  
+   oxide.reload Orangemart  
    ```
 
-### Important Note on Skin IDs:
-- The DepositBoxSkinID is used to differentiate between regular storage containers and deposit boxes. Admins should ensure that they select a skin ID that is not actively available in the skin box to avoid confusion or accidental misuse by players. Using a skin that is easily accessible to players could result in unintended behavior where non-deposit boxes are treated as deposit boxes.
+---
 
 ## Permissions
 
-- `depositbox.place`: Grants a player permission to place a deposit box.
+The plugin uses the following permissions:
 
-To assign this permission, use the following command:
-```bash
-oxide.grant user <username> depositbox.place
-```
+- **`orangemart.buycurrency`**  
+  Grants permission to players who are allowed to buy your currency item via Bitcoin.
 
-## Functionality
+- **`orangemart.sendcurrency`**  
+  Grants permission to players who are allowed to send Bitcoin for your in-game currency unit.
 
-### Hooks
+- **`orangemart.buyvip`**  
+  Grants permission to players to purchase VIP via Bitcoin.
 
-- **Init()**: Initializes the plugin, loads the configuration, and registers permissions.
-- **OnServerInitialized()**: Scans the server for `StorageContainer` entities and applies the plugin's functionality to deposit boxes.
-- **Unload()**: Cleans up and removes deposit box restrictions when the plugin is unloaded.
-- **OnEntitySpawned()**: When a `StorageContainer` is spawned, the plugin checks if it’s a deposit box and ensures it follows the required rules.
+---
 
-### Item Handling
+## Logging and Troubleshooting
 
-- The plugin restricts item deposits to a hardcoded whitelist (currently, only paper can be deposited).
-- If an item is not on the whitelist, it will remain in the player's inventory, and only paper will be removed and logged.
-- **Logging**: Every time a player deposits paper into the box, the action is logged for administrative tracking.
+- **Logs:**  
+  Transaction details, such as purchases and currency sends, are logged for auditing purposes. Logs can be found in the `oxide/data/Orangemart` directory.
 
-### Custom Logging
+- **Troubleshooting:**  
+  If any issues arise, check the server logs for errors related to the plugin. Ensure that the configuration file is correctly set up and that Bitcoin payment services are running as expected.
 
-- All paper deposits are logged in the `oxide/data/DepositBoxLog.json` file, structured as follows:
-  ```json
-  {
-    "SteamID": "player_steam_id",
-    "amount_deposited": "amount_deposited",
-    "Timestamp": "2024-09-22T12:00:00"
-  }
-  ```
-  This allows server administrators to keep track of deposits and monitor player activity.
+---
+
+## License
+
+This plugin is licensed under the MIT License.
