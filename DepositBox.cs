@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using Oxide.Core;
 using Oxide.Core.Libraries.Covalence;
+using System.Globalization;
 
 namespace Oxide.Plugins
 {
-    [Info("DepositBox", "saulteafarmer", "0.1.1")]
+    [Info("DepositBox", "saulteafarmer", "0.1.2")]
     [Description("Drop box that registers drops for admin while removing items from the game.")]
     internal class DepositBox : RustPlugin
     {
@@ -172,7 +173,7 @@ namespace Oxide.Plugins
             var entry = new DepositEntry
             {
                 SteamId = player.UserIDString,
-                Timestamp = DateTime.UtcNow.ToString("o"),
+                Timestamp = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture), // Use IFormatProvider here
                 AmountDeposited = amount
             };
 
@@ -182,7 +183,8 @@ namespace Oxide.Plugins
             SaveDepositLog();
 
             // Send message to the player
-            player.ChatMessage(lang.GetMessage("DepositRecorded", this, player.UserIDString).Replace("{amount}", amount.ToString()));
+            player.ChatMessage(lang.GetMessage("DepositRecorded", this, player.UserIDString)
+                .Replace("{amount}", amount.ToString(CultureInfo.InvariantCulture)));  // Use IFormatProvider here
         }
 
         public void TrackDeposit(Item item, BasePlayer player)
@@ -209,8 +211,8 @@ namespace Oxide.Plugins
 
         private void LoadConfiguration()
         {
-            DepositItemID = Convert.ToInt32(Config["DepositItemID"]);
-            DepositBoxSkinID = Convert.ToUInt64(Config["DepositBoxSkinID"]);
+            DepositItemID = Convert.ToInt32(Config["DepositItemID"], CultureInfo.InvariantCulture);  // Use IFormatProvider here
+            DepositBoxSkinID = Convert.ToUInt64(Config["DepositBoxSkinID"], CultureInfo.InvariantCulture);  // Use IFormatProvider here
         }
 
         #endregion
