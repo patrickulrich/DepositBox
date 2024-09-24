@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization; // Added for CultureInfo
+using System.Globalization; // For CultureInfo
 using Newtonsoft.Json;
 using Oxide.Core;
 using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-    [Info("DepositBox", "saulteafarmer", "0.1.6")]
+    [Info("DepositBox", "saulteafarmer", "0.1.7")]
     [Description("Drop box that registers drops for admin while removing items from the game.")]
     internal class DepositBox : RustPlugin
     {
@@ -149,6 +149,12 @@ namespace Oxide.Plugins
 
         public void LogDeposit(BasePlayer player, int amount)
         {
+            if (player == null)
+            {
+                PrintError("LogDeposit called with a null player.");
+                return;
+            }
+
             var entry = new DepositEntry
             {
                 SteamId = player.UserIDString,
@@ -158,9 +164,11 @@ namespace Oxide.Plugins
             Puts($"Logging deposit: SteamID={entry.SteamId}, Amount={entry.AmountDeposited}, Timestamp={entry.Timestamp}");
             depositLog.Deposits.Add(entry);
             SaveDepositLog();
+
             // Send message to the player
-            player.ChatMessage(lang.GetMessage("DepositRecorded", this, player.UserIDString)
-                .Replace("{amount}", amount.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)); // Specified CultureInfo and StringComparison
+            string message = lang.GetMessage("DepositRecorded", this, player.UserIDString)
+                .Replace("{amount}", amount.ToString(CultureInfo.InvariantCulture));
+            player.ChatMessage(message);
         }
 
         public void TrackDeposit(Item item, BasePlayer player)
