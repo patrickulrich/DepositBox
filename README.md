@@ -81,7 +81,7 @@ oxide.grant user <username> depositbox.place
   ```json
   {
     "SteamID": "player_steam_id",
-    "ItemID": "item_id",
+    "amount_deposited": "amount_deposited",
     "Timestamp": "2024-09-22T12:00:00"
   }
   ```
