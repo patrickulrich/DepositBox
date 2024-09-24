@@ -7,7 +7,7 @@ using System.Globalization;
 
 namespace Oxide.Plugins
 {
-    [Info("DepositBox", "saulteafarmer", "0.1.3")]
+    [Info("DepositBox", "saulteafarmer", "0.1.4")]
     [Description("Drop box that registers drops for admin while removing items from the game.")]
     internal class DepositBox : RustPlugin
     {
@@ -124,10 +124,16 @@ namespace Oxide.Plugins
 
         public void LogDeposit(BasePlayer player, int amount)
         {
+            if (player == null)
+            {
+                Interface.Oxide.LogWarning("LogDeposit called with null player.");
+                return;
+            }
+
             logger.LogDeposit(player, amount);
 
             player.ChatMessage(lang.GetMessage("DepositRecorded", this, player.UserIDString)
-                .Replace("{amount}", amount.ToString(CultureInfo.InvariantCulture)));
+                .Replace("{amount}", amount.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
         }
 
         public void TrackDeposit(Item item, BasePlayer player)
@@ -151,8 +157,8 @@ namespace Oxide.Plugins
 
         private void LoadConfiguration()
         {
-            DepositItemID = Convert.ToInt32(Config["DepositItemID"]);
-            DepositBoxSkinID = Convert.ToUInt64(Config["DepositBoxSkinID"]);
+            DepositItemID = Convert.ToInt32(Config["DepositItemID"], CultureInfo.InvariantCulture);
+            DepositBoxSkinID = Convert.ToUInt64(Config["DepositBoxSkinID"], CultureInfo.InvariantCulture);
         }
 
         #endregion
@@ -185,6 +191,12 @@ namespace Oxide.Plugins
 
         public void LogDeposit(BasePlayer player, int amount)
         {
+            if (player == null)
+            {
+                Interface.Oxide.LogWarning("LogDeposit called with null player.");
+                return;
+            }
+
             var entry = new DepositEntry
             {
                 SteamId = player.UserIDString,
@@ -194,7 +206,7 @@ namespace Oxide.Plugins
 
             Interface.Oxide.LogInfo($"Logging deposit: SteamID={entry.SteamId}, Amount={entry.AmountDeposited}, Timestamp={entry.Timestamp}");
 
-            depositLog.Deposits.Add(entry);
+            depositLog.AddDeposit(entry);
             SaveDepositLog();
         }
 
@@ -230,8 +242,15 @@ namespace Oxide.Plugins
 
     public class DepositLog
     {
+        private readonly List<DepositEntry> _deposits = new List<DepositEntry>();
+
         [JsonProperty("deposits")]
-        public List<DepositEntry> Deposits { get; set; } = new List<DepositEntry>();
+        public IReadOnlyCollection<DepositEntry> Deposits => _deposits.AsReadOnly();
+
+        public void AddDeposit(DepositEntry entry)
+        {
+            _deposits.Add(entry);
+        }
     }
 
     public class DepositEntry
