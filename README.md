@@ -9,6 +9,8 @@ The **DepositBox** plugin allows players to deposit specific items (e.g., paper)
 - Prevents non-whitelisted items from being deposited.
 - Can be used to run events or competitions where players turn in items for rewards.
 
+Once installed players with permission will be able to create a deposit box using /depositbox as a chat command. They can then place this box down allowing players to make deposits into it. All deposits are logged to the data folder.
+
 ## Installation
 
 1. Upload the `DepositBox.cs` file to your Rust server under the `/oxide/plugins/` directory.
@@ -18,7 +20,7 @@ The **DepositBox** plugin allows players to deposit specific items (e.g., paper)
    ```
 3. Ensure you grant users permission to use the deposit box:
    ```bash
-   oxide.grant user <username> depositbox.use
+   oxide.grant user <username> depositbox.place
    ```
 
 ## Configuration
@@ -55,7 +57,7 @@ You can edit these values directly in the configuration file if needed.
 
 To assign this permission, use the following command:
 ```bash
-oxide.grant user <username> depositbox.use
+oxide.grant user <username> depositbox.place
 ```
 
 ## Functionality
